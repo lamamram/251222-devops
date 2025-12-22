@@ -1,0 +1,132 @@
+# image docker du pipeline (pour chaque job) par défaut
+image: python:3.13-slim-bookworm
+
+# étapes du pipeline à exécuter dans l'ordre
+stages:
+  - buiding
+  - testing
+  - qualifying
+  - interface-tests
+
+# variable d'environnement custom
+variables:
+  TRIGGER_CACHE: "off"
+
+generate_deps:
+  stage: buiding
+  tags:
+    - formation
+  script:
+    - python3 -m venv v_env
+    - source ./v_env/bin/activate
+    - pip3 install -r app/requirements.txt
+    - pip3 install -r app/requirements-dev.txt
+  # cacher le dossier v_env pour les jobs suivants
+  cache:
+    key: pip_deps
+    paths:
+      - v_env
+    untracked: true
+    policy: push
+  # on exécute ce job uniquement si le fichier requirements.txt a été modifié
+  rules:
+    - changes:
+        - app/requirements*.txt
+      when: on_success
+    - if: $TRIGGER_CACHE == "on"
+
+
+# nom arbitraire d'un job
+test:
+  stage: testing
+  # association entre un job et un/des runner(s)
+  tags:
+    - formation
+  before_script:
+    - source v_env/bin/activate
+  # script à exécuter
+  script:
+    - cd app
+    # ">" convertit les saut de ligne en espace
+    - >
+      pytest -v -m "not e2e" 
+      --junit-xml=./units.xml
+      --cov=bank
+      --cov-report=term
+      --cov-report=xml:./coverage.xml
+  # regex permet de faire remonter le pourcentage de couverture total dans gitlab
+  coverage: "/^TOTAL.*?([0-9]{1,3})%/"
+  # utilisation du cache
+  cache:
+    key: pip_deps
+    untracked: true
+    policy: pull
+  # tout fichier ou dossier créé généré au cours de l'exécution du job
+  # à faire remonter dans l'interface Gitlab OU en téléchargement
+  artifacts:
+    access: developer
+    expire_in: "1 hour"
+    # téléchargement et ajout aux jobs suivants
+    paths:
+      - app/units.xml
+    # rapports spéciaux avec des formats spécifiques attendus par Gitlab
+    # interpétés par la GUI gitlab
+    reports:
+      junit:
+        - app/units.xml
+      # remonter le rapport de couverture
+      coverage_report:
+        coverage_format: cobertura
+        path: app/coverage.xml
+      
+
+quality:
+  stage: qualifying
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  tags:
+    - formation
+  script:
+    # utiliser une variable cachée pour le token => slide gitlab
+    - >
+      sonar-scanner
+      -Dsonar.projectKey=project
+      -Dsonar.sources=./app/bank
+      -Dsonar.exclusions=./app/bank/tests/**/*.py
+      -Dsonar.host.url=http://gitlab.lan.fr:9000
+      -Dsonar.login=$SONAR_TOKEN
+      -Dsonar.qualitygate.wait=true
+
+## POST DEPLOYMENT
+
+e2e:
+  stage: interface-tests
+  tags:
+    - formation
+  # 3. on va se donner un conteneur "sidecar" / service : selenium/firefox
+  services:
+    - name: selenium/standalone-firefox:latest
+      # nom du domaine du serveur !!!
+      alias: selenium-server
+  before_script:
+    # 2. le script client (test ) doit avoir accès au driver (geckodriver)
+    # on exécute le conteneur en tant que root
+    # on met le driver dans le PATH 
+    - mv geckodriver /usr/bin/
+    - chmod +x /usr/bin/geckodriver
+  script:
+    - source ./venv/bin/activate
+    - cd app
+    # 1. il va falloir distinguer les tests unitaires des tests e2e:
+    # => avec le marqueur activé dans le pytest.ini
+    - pytest -m e2e
+  cache:
+    key: pip_deps
+    untracked: true
+    policy: pull
+  # alias YAML
+  # rules: *staging
+  rules: &staging
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_TAG
