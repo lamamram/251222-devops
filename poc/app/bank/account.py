@@ -23,7 +23,7 @@ class Account:
 
     _model = "accounts"
 
-    def __init__(self, _id, client, source="json"):
+    def __init__(self, _id, client, source="json"):   
         self.__id = _id
         self.__client = client
         data = store.get_factory(source, self._model).get_model(self.__id)
@@ -37,8 +37,8 @@ class Account:
 
     ## publique methods
     def deposit(self, value: float):
-        if isinstance(value, (int, float)) and value > 0:
-            self.__update_balance(value)
+        if isinstance(value, (int, float)) and value > 0: 
+            self.__update_balance(value) 
 
     def withdraw(self, value: float):
         """

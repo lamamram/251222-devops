@@ -80,7 +80,7 @@ test:
         path: app/coverage.xml
       
 
-quality:
+.quality:
   stage: qualifying
   image:
     name: sonarsource/sonar-scanner-cli:latest
@@ -100,7 +100,7 @@ quality:
 
 ## POST DEPLOYMENT
 
-e2e:
+.e2e:
   stage: interface-tests
   tags:
     - formation

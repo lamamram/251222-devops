@@ -36,6 +36,6 @@ def test_deposit(account_1):
     init_balance = account.getBalance()
     # Act
     amount = 100.0
-    account.deposit(amount)
-    # Assert
+    account.deposit(amount)   
+    # Assert  
     assert init_balance < account.getBalance()
