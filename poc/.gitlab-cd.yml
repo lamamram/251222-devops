@@ -4,6 +4,7 @@ variables:
   DOCKER_VERSION: 28
 
 stages:
+
   - loading
   - building
   - scaning
@@ -26,13 +27,12 @@ load:
       -k 
       --location 
       --header "JOB-TOKEN: $CI_JOB_TOKEN"
-      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/java_sb/staging-rc/java-sb.tar.gz"
-      | tar xzv -C java-sb_img
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app/staging-rc/sample.war"
+      -o sample.war
   artifacts:
     expire_in: "5 minutes"
     paths:
-      - java-sb_img/target/java-sb.war.original
-      - java-sb_img/tag.txt
+      - sample.war
 
 build:
   stage: building
@@ -40,21 +40,21 @@ build:
   before_script:
     - *login
   script:
-    - cd java-sb_img
-    - docker build -t $CI_REGISTRY_IMAGE/java-sb:staging-rc .
-    - docker run -d --restart unless-stopped --name test $CI_REGISTRY_IMAGE/java-sb:staging-rc
+    # - cd java-sb_img
+    - docker build -t $CI_REGISTRY_IMAGE/sample:staging-rc .
+    - docker run -d --restart unless-stopped --name test $CI_REGISTRY_IMAGE/sample:staging-rc
     - sleep 60
     - docker ps --filter name=test | grep -o "(healthy)"
-    - tag=$(cat tag.txt)
-    - docker tag $CI_REGISTRY_IMAGE/java-sb:staging-rc $CI_REGISTRY_IMAGE/java-sb:$tag
-    - docker push $CI_REGISTRY_IMAGE/java-sb:$tag
+    # - tag=$(cat tag.txt)
+    # - docker tag $CI_REGISTRY_IMAGE/sample:staging-rc $CI_REGISTRY_IMAGE/java-sb:$tag
+    - docker push $CI_REGISTRY_IMAGE/sample:staging-rc
   after_script:
     - docker ps --filter name=test && docker rm -f test
-  artifacts:
-    access: developer
-    expire_in: "5 minutes"
-    paths:
-      - java-sb_img/tag.txt
+  # artifacts:
+  #   access: developer
+  #   expire_in: "5 minutes"
+  #   paths:
+  #     - java-sb_img/tag.txt
 
 scan:
   stage: scaning
@@ -77,11 +77,11 @@ scan:
   tags: [formation]
   before_script: [""]
   script:
-    - tag=$(cat java-sb_img/tag.txt)
+    # - tag=$(cat java-sb_img/tag.txt)
     - >
       trivy image 
       $TRIVY_OPTS
-      "$CI_REGISTRY_IMAGE/java-sb:$tag"
+      "$CI_REGISTRY_IMAGE/sample:staging-rc"
       --format template 
       --template "@/contrib/junit.tpl" 
       -o junit-report.xml
@@ -97,7 +97,7 @@ scan:
     policy: pull-push
   dependencies: [build]
 
-staging:
+.staging:
   stage: staging
   tags:
     - formation

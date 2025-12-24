@@ -6,13 +6,14 @@ stages:
   - buiding
   - testing
   - qualifying
+  - packaging
   - interface-tests
 
 # variable d'environnement custom
 variables:
   TRIGGER_CACHE: "off"
 
-generate_deps:
+.generate_deps:
   stage: buiding
   tags:
     - formation
@@ -37,7 +38,7 @@ generate_deps:
 
 
 # nom arbitraire d'un job
-test:
+.test:
   stage: testing
   # association entre un job et un/des runner(s)
   tags:
@@ -98,6 +99,46 @@ test:
       -Dsonar.login=$SONAR_TOKEN
       -Dsonar.qualitygate.wait=true
 
+### exemple de job de packaging et upload vers un dépôt de packages
+
+package:
+  stage: packaging
+  image: curlimages/curl:latest
+  tags:
+    - formation
+  script:
+    # - >
+    #   mvn
+    #   -Dmaven.test.skip=true 
+    #   package
+    # - echo "$CI_COMMIT_TAG" > tag.txt
+    # - tar -czvf java-sb.tar.gz target/java-sb.war.original tag.txt
+    - >
+      curl 
+      -k
+      --header "JOB-TOKEN: $CI_JOB_TOKEN" 
+      --upload-file sample.war
+      "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/app/staging-rc/sample.war"
+  # rules:
+  #   - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+$/
+  #     when: on_success
+
+
+# trigger_staging:
+#   stage: staging
+#   trigger:
+#     project: "formation/ops"
+#     branch: main
+#     strategy: depend
+  # environment:
+  #   name: staging
+  #   url: http://gitlab.lan.fr:8081/java-sb
+  #   auto_stop_in: "3 hours"
+  # rules:
+  #   - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+$/
+  #     when: on_success
+
+
 ## POST DEPLOYMENT
 
 .e2e:
@@ -125,8 +166,5 @@ test:
     key: pip_deps
     untracked: true
     policy: pull
-  # alias YAML
-  # rules: *staging
-  rules: &staging
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_TAG
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+$/

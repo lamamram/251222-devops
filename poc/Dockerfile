@@ -3,7 +3,7 @@ FROM tomcat:11-jdk21
 RUN useradd -M -d /usr/local/tomcat -U tomcat && \
     chown -R tomcat:tomcat /usr/local/tomcat
 
-COPY --chown=tomcat:tomcat ./target/java-sb.war.original /usr/local/tomcat/webapps/java-sb.war
+COPY --chown=tomcat:tomcat ./sample.war /usr/local/tomcat/webapps/sample.war
 
 USER tomcat
 WORKDIR /usr/local/tomcat/webapps
